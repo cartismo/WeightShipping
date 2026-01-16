@@ -1,0 +1,25 @@
+{
+    "name": "cartismo/weight-shipping",
+    "description": "Weight-based shipping module for Cartismo",
+    "type": "cartismo-module",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Cartismo",
+            "email": "support@cartismo.com"
+        }
+    ],
+    "require": {},
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\WeightShipping\\Providers\\WeightShippingServiceProvider"
+            ]
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\WeightShipping\\": ""
+        }
+    }
+}

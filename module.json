@@ -1,0 +1,16 @@
+{
+    "name": "WeightShipping",
+    "alias": "weightshipping",
+    "description": "Weight-based shipping module with configurable rates per weight unit",
+    "keywords": ["shipping", "weight", "weight-based", "delivery"],
+    "priority": 0,
+    "providers": [
+        "Modules\\WeightShipping\\Providers\\WeightShippingServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": [],
+    "type": "shipping",
+    "version": "1.0.0",
+    "is_core": false
+}
