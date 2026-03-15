@@ -14,6 +14,7 @@ class WeightShippingServiceProvider extends ServiceProvider
     {
         $this->registerConfig();
         $this->registerViews();
+        $this->registerTranslations();
         $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/Migrations'));
     }
 
@@ -48,6 +49,20 @@ class WeightShippingServiceProvider extends ServiceProvider
         ], ['views', $this->moduleNameLower . '-module-views']);
 
         $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->moduleNameLower);
+    }
+
+    protected function registerTranslations(): void
+    {
+        $langPath = resource_path('lang/modules/' . $this->moduleNameLower);
+
+        if (is_dir($langPath)) {
+            $this->loadTranslationsFrom($langPath, $this->moduleNameLower);
+            $this->loadJsonTranslationsFrom($langPath);
+        } else {
+            $moduleLangPath = module_path($this->moduleName, 'Resources/lang');
+            $this->loadTranslationsFrom($moduleLangPath, $this->moduleNameLower);
+            $this->loadJsonTranslationsFrom($moduleLangPath);
+        }
     }
 
     public function provides(): array

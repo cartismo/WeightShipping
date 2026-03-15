@@ -2,111 +2,179 @@
 
 namespace Modules\WeightShipping\Services;
 
+use App\Contracts\AbstractShippingMethod;
 use App\Models\InstalledModule;
 
-class WeightShippingService
+class WeightShippingService extends AbstractShippingMethod
 {
-    protected ?array $settings = null;
-
-    public function getSettings(): array
+    public static function defaultSettings(): array
     {
-        if ($this->settings === null) {
-            $module = InstalledModule::where('slug', 'weight-shipping')->first();
-            $defaultSettings = config('weightshipping.settings', []);
-            $this->settings = array_replace_recursive($defaultSettings, $module?->settings ?? []);
+        return [
+            'enabled' => true,
+            'title' => self::translateSetting('default_title', 'Weight Based Shipping'),
+            'description' => self::translateSetting('default_description', 'Shipping cost calculated by order weight'),
+            'weight_unit' => 'kg',
+            'calculation_type' => 'per_unit',
+            'base_cost' => 0.00,
+            'cost_per_unit' => 5.00,
+            'free_shipping_threshold' => null,
+            'max_weight' => null,
+            'handling_fee' => 0.00,
+            'rates' => [],
+            'sort_order' => 0,
+        ];
+    }
+
+    public function __construct(?InstalledModule $module = null)
+    {
+        if ($module === null) {
+            $module = InstalledModule::query()->where('slug', 'weight-shipping')->first();
         }
-        return $this->settings;
+
+        parent::__construct($module);
+
+        $this->settings = array_replace_recursive(self::defaultSettings(), $this->settings);
     }
 
-    public function isEnabled(): bool
+    public function getDeliveryType(): string
     {
-        return $this->getSettings()['enabled'] ?? false;
-    }
-
-    public function getTitle(): string
-    {
-        return $this->getSettings()['title'] ?? 'Weight Based Shipping';
+        return self::DELIVERY_TYPE_ADDRESS;
     }
 
     public function getWeightUnit(): string
     {
-        return $this->getSettings()['weight_unit'] ?? 'kg';
+        return (string) ($this->settings['weight_unit'] ?? 'kg');
     }
 
-    public function isAvailable(float $weight): bool
+    public function isAvailable(float $cartWeight): bool
     {
         if (!$this->isEnabled()) {
             return false;
         }
-        $maxWeight = $this->getSettings()['max_weight'] ?? null;
-        return $maxWeight === null || $weight <= $maxWeight;
+
+        $maxWeight = $this->settings['max_weight'] ?? null;
+
+        return $maxWeight === null || $maxWeight === '' || $cartWeight <= (float) $maxWeight;
     }
 
-    public function calculateCost(float $weight, float $cartTotal = 0): float
+    public function calculateCost(float $cartTotal, float $cartWeight = 0, array $deliveryData = []): float
     {
         if (!$this->isEnabled()) {
             return 0.00;
         }
 
-        $settings = $this->getSettings();
+        if (!$this->isAvailable($cartWeight)) {
+            return -1;
+        }
 
-        // Check for free shipping threshold
-        $freeThreshold = $settings['free_shipping_threshold'] ?? null;
-        if ($freeThreshold !== null && $cartTotal >= $freeThreshold) {
+        $freeThreshold = $this->settings['free_shipping_threshold'] ?? null;
+        if ($freeThreshold !== null && $freeThreshold !== '' && $cartTotal >= (float) $freeThreshold) {
             return 0.00;
         }
 
-        $calculationType = $settings['calculation_type'] ?? 'per_unit';
-        $baseCost = (float) ($settings['base_cost'] ?? 0);
-        $handlingFee = (float) ($settings['handling_fee'] ?? 0);
+        $baseCost = (float) ($this->settings['base_cost'] ?? 0);
+        $handlingFee = (float) ($this->settings['handling_fee'] ?? 0);
+        $calculationType = (string) ($this->settings['calculation_type'] ?? 'per_unit');
 
-        if ($calculationType === 'tiered') {
-            $cost = $this->calculateTieredCost($weight, $settings['rates'] ?? []);
-        } else {
-            $costPerUnit = (float) ($settings['cost_per_unit'] ?? 0);
-            $cost = $baseCost + ($weight * $costPerUnit);
-        }
+        $cost = $calculationType === 'tiered'
+            ? $this->calculateTieredCost($cartWeight, (array) ($this->settings['rates'] ?? []))
+            : $baseCost + ($cartWeight * (float) ($this->settings['cost_per_unit'] ?? 0));
 
-        return $cost + $handlingFee;
+        return round(max(0, $cost + $handlingFee), 2);
     }
 
-    protected function calculateTieredCost(float $weight, array $rates): float
+    public function getShippingMethod(float $cartTotal = 0, float $cartWeight = 0): ?array
     {
-        if (empty($rates)) {
-            return 0.00;
-        }
-
-        usort($rates, fn($a, $b) => ($a['min_weight'] ?? 0) <=> ($b['min_weight'] ?? 0));
-
-        foreach ($rates as $rate) {
-            $minWeight = (float) ($rate['min_weight'] ?? 0);
-            $maxWeight = (float) ($rate['max_weight'] ?? PHP_FLOAT_MAX);
-
-            if ($weight >= $minWeight && $weight <= $maxWeight) {
-                return (float) ($rate['cost'] ?? 0);
-            }
-        }
-
-        $lastRate = end($rates);
-        return (float) ($lastRate['cost'] ?? 0);
-    }
-
-    public function getShippingMethod(float $weight, float $cartTotal = 0): ?array
-    {
-        if (!$this->isAvailable($weight)) {
+        if (!$this->isAvailable($cartWeight)) {
             return null;
         }
 
-        $cost = $this->calculateCost($weight, $cartTotal);
+        $cost = $this->calculateCost($cartTotal, $cartWeight);
+        if ($cost < 0) {
+            return null;
+        }
 
-        return [
-            'id' => 'weight-shipping',
-            'title' => $this->getTitle(),
-            'description' => $this->getSettings()['description'] ?? '',
-            'cost' => $cost,
-            'formatted_cost' => $cost > 0 ? number_format($cost, 2) : 'Free',
-            'weight' => $weight,
-            'weight_unit' => $this->getWeightUnit(),
-        ];
+        $data = parent::getShippingMethod($cartTotal, $cartWeight);
+
+        if (!$data) {
+            return null;
+        }
+
+        $data['weight'] = $cartWeight;
+        $data['weight_unit'] = $this->getWeightUnit();
+
+        return $data;
+    }
+
+    public function hasFreeShipping(float $cartTotal): bool
+    {
+        $threshold = $this->settings['free_shipping_threshold'] ?? null;
+
+        return $threshold !== null && $threshold !== '' && $cartTotal >= (float) $threshold;
+    }
+
+    public function getAmountForFreeShipping(float $cartTotal): ?float
+    {
+        $threshold = $this->settings['free_shipping_threshold'] ?? null;
+
+        if ($threshold === null || $threshold === '' || $cartTotal >= (float) $threshold) {
+            return null;
+        }
+
+        return (float) $threshold - $cartTotal;
+    }
+
+    protected function calculateTieredCost(float $cartWeight, array $rates): float
+    {
+        if (empty($rates)) {
+            return (float) ($this->settings['base_cost'] ?? 0);
+        }
+
+        $normalizedRates = collect($rates)
+            ->filter(fn($rate) => is_array($rate))
+            ->map(function (array $rate): array {
+                return [
+                    'min_weight' => (float) ($rate['min_weight'] ?? 0),
+                    'max_weight' => array_key_exists('max_weight', $rate) && $rate['max_weight'] !== null && $rate['max_weight'] !== ''
+                        ? (float) $rate['max_weight']
+                        : null,
+                    'cost' => (float) ($rate['cost'] ?? 0),
+                ];
+            })
+            ->sortBy('min_weight')
+            ->values()
+            ->all();
+
+        foreach ($normalizedRates as $rate) {
+            $maxWeight = $rate['max_weight'] ?? null;
+
+            if ($cartWeight >= $rate['min_weight'] && ($maxWeight === null || $cartWeight <= $maxWeight)) {
+                return $rate['cost'];
+            }
+        }
+
+        $lastRate = end($normalizedRates);
+
+        return (float) ($lastRate['cost'] ?? 0);
+    }
+
+    protected static function translateSetting(string $key, string $fallback): string
+    {
+        $translationKey = 'weightshipping::settings.' . $key;
+        $translated = trans($translationKey);
+
+        if ($translated !== $translationKey) {
+            return $translated;
+        }
+
+        $fallbackLocale = config('app.fallback_locale', 'en');
+        $fallbackTranslation = trans($translationKey, [], $fallbackLocale);
+
+        return $fallbackTranslation !== $translationKey ? $fallbackTranslation : $fallback;
+    }
+
+    protected function getIcon(): string
+    {
+        return 'scale';
     }
 }
