@@ -11,8 +11,8 @@ class WeightShippingService extends AbstractShippingMethod
     {
         return [
             'enabled' => true,
-            'title' => self::translateSetting('default_title', 'Weight Based Shipping'),
-            'description' => self::translateSetting('default_description', 'Shipping cost calculated by order weight'),
+            'title' => self::translateSetting('default_title'),
+            'description' => self::translateSetting('default_description'),
             'weight_unit' => 'kg',
             'calculation_type' => 'per_unit',
             'base_cost' => 0.00,
@@ -158,7 +158,7 @@ class WeightShippingService extends AbstractShippingMethod
         return (float) ($lastRate['cost'] ?? 0);
     }
 
-    protected static function translateSetting(string $key, string $fallback): string
+    protected static function translateSetting(string $key): string
     {
         return __('weightshipping::settings.' . $key);
     }
