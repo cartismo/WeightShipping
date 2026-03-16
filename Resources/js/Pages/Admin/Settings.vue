@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
+import { useConfirmDialog } from '@/Composables/useConfirmDialog.js';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import StoreSettingsTabs from '@/Components/Admin/StoreSettingsTabs.vue';
 import {
@@ -25,6 +26,7 @@ const props = defineProps({
 });
 
 const page = usePage();
+const { confirm } = useConfirmDialog();
 const storeTabsRef = ref(null);
 const saving = ref(false);
 
@@ -126,10 +128,13 @@ const submit = () => {
     });
 };
 
-const resetAll = () => {
-    if (!window.confirm(t('reset_confirm'))) {
-        return;
-    }
+const resetAll = async () => {
+    const confirmed = await confirm({
+        title: t('reset'),
+        message: t('reset_confirm'),
+        variant: 'warning',
+    });
+    if (!confirmed) return;
 
     Object.assign(currentSettings.value, JSON.parse(JSON.stringify(props.defaultSettings || {})));
 };

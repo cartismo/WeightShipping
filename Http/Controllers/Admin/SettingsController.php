@@ -29,7 +29,7 @@ class SettingsController extends Controller
     {
         $data = $this->getMultiStoreData();
         $data['options'] = $this->getOptions();
-        $data['translations'] = $this->getTranslations();
+        $data['translations'] = __('weightshipping::settings');
 
         return Inertia::render('WeightShipping::Admin/Settings', $data);
     }
@@ -63,35 +63,25 @@ class SettingsController extends Controller
     {
         return [
             'weight_units' => [
-                ['value' => 'kg', 'label' => $this->trans('weight_unit_kg')],
-                ['value' => 'lb', 'label' => $this->trans('weight_unit_lb')],
-                ['value' => 'g', 'label' => $this->trans('weight_unit_g')],
-                ['value' => 'oz', 'label' => $this->trans('weight_unit_oz')],
+                ['value' => 'kg', 'label' => __('weightshipping::settings.weight_unit_kg')],
+                ['value' => 'lb', 'label' => __('weightshipping::settings.weight_unit_lb')],
+                ['value' => 'g', 'label' => __('weightshipping::settings.weight_unit_g')],
+                ['value' => 'oz', 'label' => __('weightshipping::settings.weight_unit_oz')],
             ],
             'calculation_types' => [
                 [
                     'value' => 'per_unit',
-                    'label' => $this->trans('calculation_type_per_unit'),
-                    'description' => $this->trans('calculation_type_per_unit_desc'),
+                    'label' => __('weightshipping::settings.calculation_type_per_unit'),
+                    'description' => __('weightshipping::settings.calculation_type_per_unit_desc'),
                 ],
                 [
                     'value' => 'tiered',
-                    'label' => $this->trans('calculation_type_tiered'),
-                    'description' => $this->trans('calculation_type_tiered_desc'),
+                    'label' => __('weightshipping::settings.calculation_type_tiered'),
+                    'description' => __('weightshipping::settings.calculation_type_tiered_desc'),
                 ],
             ],
             'currency' => $this->getCurrencyOptions(),
         ];
-    }
-
-    protected function getTranslations(): array
-    {
-        $translations = trans('weightshipping::settings');
-        if (!is_array($translations)) {
-            $translations = trans('weightshipping::settings', [], config('app.fallback_locale', 'en'));
-        }
-
-        return is_array($translations) ? $translations : [];
     }
 
     protected function getCurrencyOptions(): array
@@ -106,18 +96,4 @@ class SettingsController extends Controller
         ];
     }
 
-    protected function trans(string $key): string
-    {
-        $translationKey = 'weightshipping::settings.' . $key;
-        $translated = trans($translationKey);
-
-        if ($translated !== $translationKey) {
-            return $translated;
-        }
-
-        $fallbackLocale = config('app.fallback_locale', 'en');
-        $fallbackTranslation = trans($translationKey, [], $fallbackLocale);
-
-        return $fallbackTranslation !== $translationKey ? $fallbackTranslation : $translationKey;
-    }
 }

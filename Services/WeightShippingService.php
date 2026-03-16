@@ -160,17 +160,7 @@ class WeightShippingService extends AbstractShippingMethod
 
     protected static function translateSetting(string $key, string $fallback): string
     {
-        $translationKey = 'weightshipping::settings.' . $key;
-        $translated = trans($translationKey);
-
-        if ($translated !== $translationKey) {
-            return $translated;
-        }
-
-        $fallbackLocale = config('app.fallback_locale', 'en');
-        $fallbackTranslation = trans($translationKey, [], $fallbackLocale);
-
-        return $fallbackTranslation !== $translationKey ? $fallbackTranslation : $fallback;
+        return __('weightshipping::settings.' . $key);
     }
 
     protected function getIcon(): string
